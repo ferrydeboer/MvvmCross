@@ -9,6 +9,7 @@ using MvvmCross.Core.ViewModels;
 using MvvmCross.Test.Core;
 using MvvmCross.Test.Mocks.Dispatchers;
 using NUnit.Framework;
+using NUnit.Framework.Interfaces;
 using NUnit.Framework.Internal;
 
 namespace MvvmCross.Test.Navigation
@@ -19,8 +20,8 @@ namespace MvvmCross.Test.Navigation
     {
         private const string TestParam = "test";
         private MvxNavigationService _navigationService;
-        private SimpleResultTestViewModel _targetedResultTestViewModel;
-        private SimpleTestViewModel _targetedTestViewModel;
+//        private SimpleResultTestViewModel _targetedResultTestViewModel;
+        private ITestViewModel _targetedTestViewModel;
         protected Mock<NavigationMockDispatcher> MockDispatcher { get; set; }
 
         [SetUp]
@@ -101,7 +102,7 @@ namespace MvvmCross.Test.Navigation
         }
 
         [Test]
-        public async Task Test_FiresBeforeNavigateMvxVm()
+        public async Task Test_FiresBeforeNavigate()
         {
             await Test_Navigate(async () =>
             {
@@ -110,18 +111,16 @@ namespace MvvmCross.Test.Navigation
         }
 
         [Test]
-        public async Task Test_FiresBeforeNavigateIMvxVm()
+        public async Task Test_FiresBeforeNavigateParam()
         {
             await Test_Navigate(async () =>
             {
                 await _navigationService.Navigate<SimpleTestViewModel, string>(TestParam);
             });
-
-            Assert.That(_targetedTestViewModel.PrepareParam, Is.EqualTo(TestParam));
         }
 
         [Test]
-        public async Task Test_FiresBeforeNavigateIMvxVmWithResult()
+        public async Task Test_FiresBeforeNavigateWithResult()
         {
             await Test_Navigate(async () =>
             {
@@ -130,7 +129,7 @@ namespace MvvmCross.Test.Navigation
         }
 
         [Test]
-        public async Task Test_FiresBeforeNavigateIMvxVmWithParamResult()
+        public async Task Test_FiresBeforeNavigateParamWithResult()
         {
             await Test_Navigate(async () =>
             {
@@ -177,7 +176,7 @@ namespace MvvmCross.Test.Navigation
             MockDispatcher.Setup(
                 x => x.ShowViewModel(It.IsAny<MvxViewModelRequest>())).Callback<MvxViewModelRequest>(mnd =>
             {
-                Assert.IsTrue(_targetedResultTestViewModel.IsPrepared);
+                Assert.IsTrue(_targetedTestViewModel.IsPrepared);
                 preparedBefore = true;
             });
 
@@ -196,7 +195,7 @@ namespace MvvmCross.Test.Navigation
             MockDispatcher.Setup(
                 x => x.ShowViewModel(It.IsAny<MvxViewModelRequest>())).Callback<MvxViewModelRequest>(mnd =>
             {
-                Assert.That(_targetedResultTestViewModel.PrepareParam, Is.EqualTo(TestParam));
+                Assert.That(_targetedTestViewModel.PrepareParam, Is.EqualTo(TestParam));
                 preparedBefore = true;
             });
 
@@ -243,7 +242,7 @@ namespace MvvmCross.Test.Navigation
             MockDispatcher.Setup(
                 x => x.ShowViewModel(It.IsAny<MvxViewModelRequest>())).Callback<MvxViewModelRequest>(mnd =>
             {
-                Assert.IsFalse(_targetedResultTestViewModel.IsInitialized);
+                Assert.IsFalse(_targetedTestViewModel.IsInitialized);
             });
 
             await Test_Navigate(async () =>
@@ -251,7 +250,7 @@ namespace MvvmCross.Test.Navigation
                 return await _navigationService.Navigate<SimpleResultTestViewModel, TestResult>(cancellationToken: new CancellationTokenSource(500).Token);
             });
 
-            Assert.IsTrue(_targetedResultTestViewModel.IsInitialized);
+            Assert.IsTrue(_targetedTestViewModel.IsInitialized);
         }
 
         [Test]
@@ -261,7 +260,7 @@ namespace MvvmCross.Test.Navigation
             MockDispatcher.Setup(
                 x => x.ShowViewModel(It.IsAny<MvxViewModelRequest>())).Callback<MvxViewModelRequest>(mnd =>
             {
-                Assert.IsFalse(_targetedResultTestViewModel.IsInitialized);
+                Assert.IsFalse(_targetedTestViewModel.IsInitialized);
             });
 
             await Test_Navigate(async () =>
@@ -269,7 +268,63 @@ namespace MvvmCross.Test.Navigation
                 return await _navigationService.Navigate<SimpleResultTestViewModel, string, TestResult>(TestParam);
             });
 
-            Assert.IsTrue(_targetedResultTestViewModel.IsInitialized);
+            Assert.IsTrue(_targetedTestViewModel.IsInitialized);
+        }
+
+        [Test]
+        public async Task Test_FiresAfterNavigate()
+        {
+            await Test_FiresAfterNavigate(async () =>
+            {
+                await _navigationService.Navigate<SimpleTestViewModel>();
+            });
+        }
+
+        [Test]
+        public async Task Test_FiresAfterNavigateParam()
+        {
+            await Test_FiresAfterNavigate(async () =>
+            {
+                await _navigationService.Navigate<SimpleTestViewModel, string>(TestParam);
+            });
+        }
+
+        [Test]
+        public async Task Test_FiresAfterNavigateWithResult()
+        {
+            await Test_FiresAfterNavigate(async () =>
+            {
+                return await _navigationService.Navigate<SimpleResultTestViewModel, TestResult>(cancellationToken: new CancellationTokenSource(500).Token);
+            });
+        }
+
+        [Test]
+        public async Task Test_FiresAfterNavigateParamWithResult()
+        {
+            await Test_FiresAfterNavigate(async () =>
+            {
+                return await _navigationService.Navigate<SimpleResultTestViewModel, string, TestResult>(TestParam);
+            });
+        }
+
+        private async Task Test_FiresAfterNavigate(Func<Task> navigationAct)
+        {
+            await Test_FiresAfterNavigate(async () =>
+            {
+                await navigationAct();
+                return new TestResult(0, string.Empty);
+            });
+        }
+
+        private async Task<TestResult> Test_FiresAfterNavigate(Func<Task<TestResult>> navigationAct)
+        {
+            _navigationService.AfterNavigate += (sender, args) =>
+            {
+                var testViewModel = args.ViewModel as ITestViewModel;
+                Assert.IsTrue(testViewModel.IsInitialized);
+            };
+
+            return await Test_Navigate(async () => await navigationAct());
         }
 
         private async Task Test_Navigate(Func<Task> navigationAct)
@@ -285,60 +340,32 @@ namespace MvvmCross.Test.Navigation
 
         private async Task<TResult> Test_Navigate<TResult>(Func<Task<TResult>> navigationAct)
         {
-            _targetedResultTestViewModel = null;
+            _targetedTestViewModel = null;
             _navigationService.BeforeNavigate +=
                 (sender, args) =>
                 {
-                    _targetedResultTestViewModel = args.ViewModel as SimpleResultTestViewModel;
+                    _targetedTestViewModel = args.ViewModel as ITestViewModel;
                 };
-            _navigationService.AfterNavigate += (sender, args) => _targetedResultTestViewModel.Done(new TestResult(0, "test"));
+            _navigationService.AfterNavigate += (sender, args) =>
+            {
+                if (_targetedTestViewModel is SimpleResultTestViewModel resultViewModel)
+                {
+                    resultViewModel.Done(new TestResult(0, "test"));
+                }
+                
+            };
 
             var result = await navigationAct();
 
-            Assert.That(_targetedResultTestViewModel, Is.Not.Null);
+            Assert.That(_targetedTestViewModel, Is.Not.Null);
 
             return result;
         }
 
-        //
-        //        [Test]
-        //        public async Task Test_NavigateWithTypedParamHasNotInitializedViewModelAfterShowing()
-        //        {
-        //            var prepareParam = "it is I";
-        //            SimpleTestViewModel targetViewModel = null;
-        //            _navigationService.BeforeNavigate +=
-        //                (sender, args) => targetViewModel = args.ViewModel as SimpleTestViewModel;
-        //
-        //            MockDispatcher.Setup(
-        //                x => x.ShowViewModel(It.IsAny<MvxViewModelRequest>())).Callback<MvxViewModelRequest>(mnd =>
-        //            {
-        //                Assert.That(targetViewModel, Is.Not.Null);
-        //                Assert.IsFalse(targetViewModel.IsInitialized);
-        //            });
-        //
-        //            await _navigationService.Navigate<SimpleTestViewModel, string>(prepareParam);
-        //        }
-        //
-        //        [Test]
-        //        public async Task Test_NavigateWithTypedParamHasInitializedViewModelAfterShowing()
-        //        {
-        //            var prepareParam = "it is I";
-        //            SimpleTestViewModel targetViewModel;
-        //            _navigationService.AfterNavigate +=
-        //                (sender, args) =>
-        //                {
-        //                    targetViewModel = args.ViewModel as SimpleTestViewModel;
-        //                    Assert.That(targetViewModel, Is.Not.Null);
-        //                    Assert.IsTrue(targetViewModel.IsInitialized);
-        //                };
-        //
-        //            await _navigationService.Navigate<SimpleTestViewModel, string>(prepareParam);
-        //        }
-
-        public class SimpleTestViewModel : MvxViewModel, IMvxViewModel<string>
+        public class SimpleTestViewModel : MvxViewModel, IMvxViewModel<string>, ITestViewModel
         {
-            public string PrepareParam { get; set; }
-            public bool IsPrepared { get; set; }
+            public string PrepareParam { get; private set; }
+            public bool IsPrepared { get; private set; }
             public string InitParam { get; private set; }
             public bool IsInitialized { get; private set; }
 
@@ -369,9 +396,9 @@ namespace MvvmCross.Test.Navigation
             }
         }
 
-        public class SimpleResultTestViewModel : MvxViewModelResult<TestResult>, IMvxViewModel<string, TestResult>
+        public class SimpleResultTestViewModel : MvxViewModelResult<TestResult>, IMvxViewModel<string, TestResult>, ITestViewModel
         {
-            public string PrepareParam { get; set; }
+            public string PrepareParam { get; private set; }
             public bool IsPrepared { get; private set; }
             public bool IsInitialized { get; private set; }
 
@@ -396,6 +423,13 @@ namespace MvvmCross.Test.Navigation
             {
                 IsPrepared = true;
             }
+        }
+
+        interface ITestViewModel
+        {
+            string PrepareParam { get; }
+            bool IsPrepared { get; }
+            bool IsInitialized { get; }
         }
 
         public class TestResult
