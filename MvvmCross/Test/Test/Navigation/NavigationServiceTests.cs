@@ -38,9 +38,9 @@ namespace MvvmCross.Test.Navigation
 
             var mockLocator = new Mock<IMvxViewModelLocator>();
             mockLocator.Setup(
-                m => m.Load(It.Is<Type>(t => t.Name == "SimpleTestViewModel"), It.IsAny<IMvxBundle>(), It.IsAny<IMvxBundle>())).Returns(() => new SimpleTestViewModel());
+                m => m.Load(It.Is<Type>(t => t == typeof(SimpleTestViewModel)), It.IsAny<IMvxBundle>(), It.IsAny<IMvxBundle>())).Returns(() => new SimpleTestViewModel());
             mockLocator.Setup(
-                m => m.Load(It.Is<Type>(t => t.Name == "SimpleResultTestViewModel"), It.IsAny<IMvxBundle>(), It.IsAny<IMvxBundle>())).Returns(() => new SimpleResultTestViewModel());
+                m => m.Load(It.Is<Type>(t => t == typeof(SimpleResultTestViewModel)), It.IsAny<IMvxBundle>(), It.IsAny<IMvxBundle>())).Returns(() => new SimpleResultTestViewModel());
             mockLocator.Setup(
                 m => m.Reload(It.IsAny<IMvxViewModel>(), It.IsAny<IMvxBundle>(), It.IsAny<IMvxBundle>())).Returns(() => new SimpleTestViewModel());
             mockLocator.Setup(
